@@ -100,7 +100,7 @@ break;
 case 'balance':
 
 $i = 0;
-$a = $darkcoin->listunspent(6,1000);
+$a = $darkcoin->listunspent(121,1000);
  
 while(count($a) > $i){
  
