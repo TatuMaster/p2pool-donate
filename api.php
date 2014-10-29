@@ -105,8 +105,9 @@ $a = $darkcoin->listunspent(121,1000);
 while(count($a) > $i){
  
 // Есть ли в базе эта транзакция?
-$select_query = $db->prepare("SELECT * FROM `income` WHERE `txid` =:id AND `type` = 'DRK'");
+$select_query = $db->prepare("SELECT * FROM `income` WHERE `txid` =:id AND `type` = 'DRK' AND `address` =:address");
 $select_query->bindParam(':id', $a["$i"]["txid"], PDO::PARAM_STR);
+$select_query->bindParam(':address', $a["$i"]["address"], PDO::PARAM_STR);
 $select_query->execute();
 if($select_query->rowCount() > 0){ $i++; continue; }
  
