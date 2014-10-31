@@ -2,8 +2,10 @@
 error_reporting(E_ALL);
 require_once('jsonRPCClient.php');
 
+$allow = 'x.x.x.x';
+
 try {  
-	$db = new PDO("mysql:host=localhost;dbname=xxxxxx", "xxxxxx", "xxxxxx");  
+	$db = new PDO("mysql:host=localhost;dbname=xxxx", "xxxx", "xxxx");  
 	$db->setAttribute( PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION );
 	$db->exec("set names utf8");
 }  
@@ -14,8 +16,8 @@ catch(PDOException $e) {
 
 function api_query($method, array $req = array()) {
         // API settings
-        $key = 'xxxxxx'; // your API-key
-        $secret = 'xxxxxx'; // your Secret-key
+        $key = 'xxxx'; // your API-key
+        $secret = 'xxxx'; // your Secret-key
  
         $req['method'] = $method;
         $mt = explode(' ', microtime());
@@ -53,10 +55,10 @@ function api_query($method, array $req = array()) {
         return $dec;
 }
 
-$vertcoin = new jsonRPCClient('http://xxxxxx:xxxxxx@127.0.0.1:5888/');
-$darkcoin = new jsonRPCClient('http://xxxxxx:xxxxxx@127.0.0.1:9998/');
+$vertcoin = new jsonRPCClient('http://xxxx:xxxx@127.0.0.1:5888/');
+$darkcoin = new jsonRPCClient('http://xxxx:xxxx@127.0.0.1:9998/');
 
-$cryptsy_drk = 'xxxxxx';
+$cryptsy_drk = 'XsRzSLTYopmD3bhodgU4oJdGLk43ejZ697';
 
 
 switch($_GET['do']){
@@ -65,7 +67,8 @@ default: die('xDD'); break;
 
 case 'gen':
 if(preg_match('/[^0-9a-zA-Z]/', $_POST['address'])) die("invalid");
-if($_POST['coin'] != 'DRK') die("nocoin");
+if($_POST['coin'] != 'DRK') $_POST['coin'] = 'DRK';
+//die("nocoin");
 
 $isvalid = $vertcoin->validateaddress($_POST['address']);
 if(!$isvalid['isvalid']) die("invalid");
@@ -99,6 +102,8 @@ break;
 
 case 'balance':
 
+if($_SERVER['REMOTE_ADDR'] != $allow) die;
+
 $i = 0;
 $a = $darkcoin->listunspent(121,1000);
  
@@ -118,13 +123,13 @@ $select_query->execute();
 if($select_query->rowCount() != 1){ $i++; continue; }
  
 // Увеличим баланс
-$update_query = $db->prepare("UPDATE `address` SET `balance` = `balance`+:money WHERE `address` = :address");
+$update_query = $db->prepare("UPDATE `address` SET `balance` = `balance`+:money-0.001 WHERE `address` = :address");
 $update_query->bindParam(':money', $a["$i"]["amount"], PDO::PARAM_STR);
 $update_query->bindParam(':address', $a["$i"]["address"], PDO::PARAM_STR);
 $update_query->execute();
  
 // Запишем лог
-$insert_query = $db->prepare("insert into `income`( `address`, `type`, `txid`, `balance`, `time`) VALUES ( :address, 'DRK', :id, :money, UNIX_TIMESTAMP())");
+$insert_query = $db->prepare("insert into `income`( `address`, `type`, `txid`, `balance`, `time`) VALUES ( :address, 'DRK', :id, :money-0.001, UNIX_TIMESTAMP())");
 $insert_query->bindParam(':id', $a["$i"]["txid"], PDO::PARAM_STR);
 $insert_query->bindParam(':money', $a["$i"]["amount"], PDO::PARAM_STR);
 $insert_query->bindParam(':address', $a["$i"]["address"], PDO::PARAM_STR);
@@ -137,6 +142,8 @@ break;
 
 
 case 'tocryptsy':
+
+if($_SERVER['REMOTE_ADDR'] != $allow) die;
 
 $select_query = $db->prepare("SELECT SUM(balance)  FROM `address` WHERE `balance` > 0.1 AND `type` = 'DRK'");
 $select_query->execute();
@@ -178,6 +185,8 @@ break;
 
 case "order_id":
 
+if($_SERVER['REMOTE_ADDR'] != $allow) die;
+
 $select_query = $db->prepare("SELECT * FROM `cryptsy` WHERE `status` = '0' AND `type` = 'DRK'");
 $select_query->execute();
 if($select_query->rowCount() > 0){
@@ -185,7 +194,7 @@ if($select_query->rowCount() > 0){
 
 	$result = api_query("allmytrades", array("startdate" => date("Y-m-d", time()-60*60*24*5), 'enddate' => date("Y-m-d", time()+60*60*24)));
 		for($i=0; $i < count($result['return']); $i++){
-		if($row['coins'] == $result['return'][$i]['quantity']){
+		if($row['coins'] == $result['return'][$i]['quantity'] && $result['return'][$i]['marketid'] == 155){
 		$update_query = $db->prepare("UPDATE `cryptsy` SET `order_id` = :order_id, `btc` = :btc-:fee, `status` = '1' WHERE `id` = :id");
 		$update_query->bindParam(':order_id', $result['return'][$i]['order_id'], PDO::PARAM_STR);
 		$update_query->bindParam(':fee', $result['return'][$i]['fee'], PDO::PARAM_STR);
@@ -205,6 +214,8 @@ break;
 
 case "buy_vtc":
 
+if($_SERVER['REMOTE_ADDR'] != $allow) die;
+$j = 0;
 $select_query = $db->prepare("SELECT * FROM `cryptsy` WHERE `status` = '1' AND `type` = 'DRK'");
 $select_query->execute();
 if($select_query->rowCount() > 0){
@@ -213,9 +224,19 @@ if($select_query->rowCount() > 0){
 	$select_order->bindParam(':sid', $row['id'], PDO::PARAM_STR);
 	$select_order->execute();
 	if($select_order->rowCount() > 0) continue;
+	
 	$result = api_query("depth", array("marketid" => 151));
 
-	$max_vtc = round((95 / 100) * $row['btc']/$result['return']['sell'][0][0], 2);
+	$select_buy = $db->prepare("SELECT SUM(btc) FROM `buy_log` WHERE `sid` =:id AND `status` = '1'");
+	$select_buy->bindParam(':id', $row['id'], PDO::PARAM_STR);
+	$select_buy->execute();
+	if($select_buy->rowCount() > 0){
+		$max = $select_buy->fetch();
+		$j = $max['SUM(coins)'];
+	}
+	
+	$max_vtc = round((95 / 100) * ($row['btc']-$max['SUM(coins)'])/$result['return']['sell'][0][0], 2);
+	
 	echo $max_vtc;
 	
 	$result = api_query("createorder", array("marketid" => 151, "ordertype" => "Buy", "quantity" => $max_vtc, "price" => $result['return']['sell'][0][0]));
@@ -234,6 +255,8 @@ break;
 
 case "check_buy":
 
+if($_SERVER['REMOTE_ADDR'] != $allow) die;
+
 $total = $coins = 0;
 $select_query = $db->prepare("SELECT * FROM `buy_log` WHERE `status` = '0'");
 $select_query->execute();
@@ -250,23 +273,28 @@ while($row = $select_query->fetch()){
 		}
 	echo "$total => $coins";
 	
+	$update_query = $db->prepare("UPDATE `buy_log` SET `btc` = :btc, `status` = '1' WHERE `order_id` = :id");
+	$update_query->bindParam(':btc', $total, PDO::PARAM_STR);
+	$update_query->bindParam(':id', $row['order_id'], PDO::PARAM_STR);
+	$update_query->execute();
+	
 	if($row['max'] == $coins) { // Закрываем сделку и выставляем статус
 		$update_query = $db->prepare("UPDATE `buy_log` SET `status` = '1' WHERE `id` = :id");
 		$update_query->bindParam(':id', $row['id'], PDO::PARAM_STR);
 		$update_query->execute();
 		
-		$update_query = $db->prepare("UPDATE `cryptsy` SET `vtc` = `vtc`+:coins, `btc` = `btc`-:total, `status` = '2' WHERE `id` = :id");
-		$update_query->bindParam(':coins', $coins, PDO::PARAM_STR);
-		$update_query->bindParam(':total', $total, PDO::PARAM_STR);
+		$select_max = $db->prepare("SELECT SUM(max), SUM(btc) FROM `buy_log` WHERE `id` = :id AND `status` = '1'");
+		$select_max->bindParam(':id', $row['id'], PDO::PARAM_STR);
+		$select_max->execute();
+		$max = $select_max->fetch();
+		
+		$update_query = $db->prepare("UPDATE `cryptsy` SET `vtc` = :coins, `btc` = :total, `status` = '2' WHERE `id` = :id");
+		$update_query->bindParam(':coins', $max['SUM(max)'], PDO::PARAM_STR);
+		$update_query->bindParam(':total', $max['SUM(btc)'], PDO::PARAM_STR);
 		$update_query->bindParam(':id', $row['sid'], PDO::PARAM_STR);
 		$update_query->execute();
-		
-		// Вывод на кошелек
-
 	} else {
-		$update_query = $db->prepare("UPDATE `cryptsy` SET `vtc` = `vtc`+:coins, `btc` = `btc`-:total, `status` = '0' WHERE `id` = :id");
-		$update_query->bindParam(':coins', $coins, PDO::PARAM_STR);
-		$update_query->bindParam(':total', $total, PDO::PARAM_STR);
+		$update_query = $db->prepare("UPDATE `cryptsy` SET `status` = '1' WHERE `id` = :id");
 		$update_query->bindParam(':id', $row['sid'], PDO::PARAM_STR);
 		$update_query->execute();
 		
@@ -278,6 +306,7 @@ break;
 
 
 case 'out':
+if($_SERVER['REMOTE_ADDR'] != $allow) die;
 
 $select_query = $db->prepare("SELECT * FROM `cryptsy` WHERE `status` = '2'");
 $select_query->execute();
@@ -292,7 +321,7 @@ $update_query->bindParam(':vtc', $coins, PDO::PARAM_STR);
 $update_query->bindParam(':id', $row['id'], PDO::PARAM_STR);
 $update_query->execute();
 
-$result = api_query("makewithdrawal", array("address" => 'xxxxxx', "amount" => $coins));
+$result = api_query("makewithdrawal", array("address" => 'VqXQrgz1osVFj4bAedwXmRFU9924R2pwwe', "amount" => $coins));
 var_dump($result);
 
 }
@@ -302,27 +331,38 @@ break;
 
 case 'send':
 
+if($_SERVER['REMOTE_ADDR'] != $allow) die;
+
 $select_query = $db->prepare("SELECT *  FROM `cryptsy` WHERE `status` = '3'");
 $select_query->execute();
 if($select_query->rowCount() > 0){
 while($row = $select_query->fetch()){
 
-$select_user = $db->prepare("SELECT *, SUM(coins) FROM `cryptsy_log` WHERE `sid` = :id AND `status` = '0'");
+$select_coins = $db->prepare("SELECT SUM(coins) FROM `cryptsy_log` WHERE `sid` = :id AND `status` = '0'");
+$select_coins->bindParam(':id', $row['id'], PDO::PARAM_STR);
+$select_coins->execute();
+$max = $select_coins->fetch();
+
+$select_user = $db->prepare("SELECT * FROM `cryptsy_log` WHERE `sid` = :id AND `status` = '0'");
 $select_user->bindParam(':id', $row['id'], PDO::PARAM_STR);
 $select_user->execute();
 while($row2 = $select_user->fetch()){
 
-$i = $vertcoin->getbalance("minconf=6");
-if($row2['SUM(coins)'] > $i) die;
 
-$p_vtc = ($row2['coins']*100)/$row2['SUM(coins)'];
+$i = $vertcoin->getbalance("*", 6);
+if($max['SUM(coins)'] > $i){ echo "{$max['SUM(coins)']} {$i}";  die('no'); }
+
+$p_vtc = ($row2['coins']*100)/$max['SUM(coins)'];
 $u_vtc = (($row['vtc']*$p_vtc)/100)-0.001;
+
 
 // Получить address
 $select_address = $db->prepare("SELECT * FROM `address` WHERE `id` = :id");
 $select_address->bindParam(':id', $row2['uid'], PDO::PARAM_STR);
 $select_address->execute();
 $row3 = $select_address->fetch();
+
+echo "$u_vtc => {$row3['vtc']} <br/>";
 
 // отправить койн
 $stxid = $vertcoin->sendtoaddress($row3['vtc'], $u_vtc);
@@ -333,12 +373,14 @@ $update_query->bindParam(':stxid', $stxid, PDO::PARAM_STR);
 $update_query->bindParam(':vtc', $u_vtc, PDO::PARAM_STR);
 $update_query->bindParam(':id', $row2['id'], PDO::PARAM_STR);
 $update_query->execute();
+
 }
 
 // записать статус
 $update_query = $db->prepare("UPDATE `cryptsy` SET status = '4' WHERE `id` = :id");
 $update_query->bindParam(':id', $row['id'], PDO::PARAM_STR);
 $update_query->execute();
+
 }
 }
 
