@@ -194,7 +194,7 @@ if($select_query->rowCount() > 0){
 
 	$result = api_query("allmytrades", array("startdate" => date("Y-m-d", time()-60*60*24*5), 'enddate' => date("Y-m-d", time()+60*60*24)));
 		for($i=0; $i < count($result['return']); $i++){
-		if($row['coins'] == $result['return'][$i]['quantity'] && $result['return'][$i]['marketid'] == 155){
+		if(round($row['coins'], 8, PHP_ROUND_HALF_DOWN) == $result['return'][$i]['quantity'] && $result['return'][$i]['marketid'] == 155){
 		$update_query = $db->prepare("UPDATE `cryptsy` SET `order_id` = :order_id, `btc` = :btc-:fee, `status` = '1' WHERE `id` = :id");
 		$update_query->bindParam(':order_id', $result['return'][$i]['order_id'], PDO::PARAM_STR);
 		$update_query->bindParam(':fee', $result['return'][$i]['fee'], PDO::PARAM_STR);
