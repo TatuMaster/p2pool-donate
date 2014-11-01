@@ -232,12 +232,12 @@ if($select_query->rowCount() > 0){
 	$select_buy->execute();
 	if($select_buy->rowCount() > 0){
 		$max = $select_buy->fetch();
-		$j = $max['SUM(coins)'];
+		$j = $max['SUM(btc)'];
 	}
 	
-	$max_vtc = round((95 / 100) * ($row['btc']-$max['SUM(coins)'])/$result['return']['sell'][0][0], 2);
+	$max_vtc = round((95 / 100) * ($row['btc']-$j)/$result['return']['sell'][0][0], 2);
 	
-	echo $max_vtc;
+	echo "$max_vtc";	
 	
 	$result = api_query("createorder", array("marketid" => 151, "ordertype" => "Buy", "quantity" => $max_vtc, "price" => $result['return']['sell'][0][0]));
 	
@@ -273,8 +273,9 @@ while($row = $select_query->fetch()){
 		}
 	echo "$total => $coins";
 	
-	$update_query = $db->prepare("UPDATE `buy_log` SET `btc` = :btc, `status` = '1' WHERE `order_id` = :id");
+	$update_query = $db->prepare("UPDATE `buy_log` SET `btc` = :btc, `coins` = :coins, `status` = '1' WHERE `order_id` = :id");
 	$update_query->bindParam(':btc', $total, PDO::PARAM_STR);
+	$update_query->bindParam(':coins', $coins, PDO::PARAM_STR);
 	$update_query->bindParam(':id', $row['order_id'], PDO::PARAM_STR);
 	$update_query->execute();
 	
@@ -283,13 +284,13 @@ while($row = $select_query->fetch()){
 		$update_query->bindParam(':id', $row['id'], PDO::PARAM_STR);
 		$update_query->execute();
 		
-		$select_max = $db->prepare("SELECT SUM(max), SUM(btc) FROM `buy_log` WHERE `id` = :id AND `status` = '1'");
+		$select_max = $db->prepare("SELECT SUM(coins), SUM(btc) FROM `buy_log` WHERE `id` = :id AND `status` = '1'");
 		$select_max->bindParam(':id', $row['id'], PDO::PARAM_STR);
 		$select_max->execute();
 		$max = $select_max->fetch();
 		
 		$update_query = $db->prepare("UPDATE `cryptsy` SET `vtc` = :coins, `btc` = :total, `status` = '2' WHERE `id` = :id");
-		$update_query->bindParam(':coins', $max['SUM(max)'], PDO::PARAM_STR);
+		$update_query->bindParam(':coins', $max['SUM(coins)'], PDO::PARAM_STR);
 		$update_query->bindParam(':total', $max['SUM(btc)'], PDO::PARAM_STR);
 		$update_query->bindParam(':id', $row['sid'], PDO::PARAM_STR);
 		$update_query->execute();
@@ -298,7 +299,10 @@ while($row = $select_query->fetch()){
 		$update_query->bindParam(':id', $row['sid'], PDO::PARAM_STR);
 		$update_query->execute();
 		
-		api_query("cancelorder", array("orderid" => $result['return'][$i]['order_id']));
+		echo $row['order_id'];
+		
+		$k = api_query("cancelorder", array("orderid" => $row['order_id']));
+		var_dump($k);
 	}
 }
 }
