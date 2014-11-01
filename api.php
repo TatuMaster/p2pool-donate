@@ -284,8 +284,8 @@ while($row = $select_query->fetch()){
 		$update_query->bindParam(':id', $row['id'], PDO::PARAM_STR);
 		$update_query->execute();
 		
-		$select_max = $db->prepare("SELECT SUM(coins), SUM(btc) FROM `buy_log` WHERE `id` = :id AND `status` = '1'");
-		$select_max->bindParam(':id', $row['id'], PDO::PARAM_STR);
+		$select_max = $db->prepare("SELECT SUM(coins), SUM(btc) FROM `buy_log` WHERE `sid` = :id AND `status` = '1'");
+		$select_max->bindParam(':id', $row['sid'], PDO::PARAM_STR);
 		$select_max->execute();
 		$max = $select_max->fetch();
 		
