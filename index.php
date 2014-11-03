@@ -6,7 +6,7 @@ $passwd = "yyy";
 
 $vertcoin	=	new jsonRPCClient("http://$user:$passwd@127.0.0.1:5888/");
 
-$i = $vertcoin->getbalance("minconf=120");
+$i = $vertcoin->getbalance("*", 120);
 
 if($i >= 10){
 	$json = file_get_contents("http://rus.p2pool.pl:9171/patron_sendmany/{$i["balance"]}/0.01");
