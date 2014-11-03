@@ -23,7 +23,7 @@ function balance($a, $c){
 	$select_query->bindParam(':address', $a["$i"]["address"], PDO::PARAM_STR);
 	$select_query->bindParam(':type', $c, PDO::PARAM_STR);
 	$select_query->execute();
-	if($select_query->rowCount() > 0){ $i++; continue; }
+	if($select_query->rowCount() > 0){ echo "$c => {$a["$i"]["amount"]} => {$a["$i"]["txid"]} <br/>"; $i++; continue; }
 	 
 	// Кто оплачивает?
 	$select_query = $db->prepare("SELECT * FROM `address` WHERE `address` =:address");
@@ -52,16 +52,27 @@ function balance($a, $c){
 function tocryptsy($type, $min, $send, $address){
 
 	global $db, $darkcoin, $feathercoin;
-
-	$select_query = $db->prepare("SELECT SUM(balance)  FROM `address` WHERE `balance` > '$min' AND `type` = '$type'");
+	$select_query = $db->prepare("SELECT * FROM `address` WHERE `balance` > $min AND `type` = '$type'");
 	$select_query->execute();
+	
 	if($select_query->rowCount() > 0){
-		$row = $select_query->fetch();
-		if($row['SUM(balance)'] > $send){
-		$send_coins = $row['SUM(balance)']-0.001;
+	
+		if($select_query->rowCount() > 1){
+			$select_query = $db->prepare("SELECT SUM(balance) FROM `address` WHERE `balance` > '$min' AND `type` = '$type'");
+			$select_query->execute();
+			$row = $select_query->fetch();
+			$sum = $row['SUM(balance)'];
+		} else {
+			$row = $select_query->fetch();
+			$sum = $row['balance'];
+		}
+
+	if($sum > $send){
+	
+		$send_coins = $sum-0.001;
 
 		$insert_query = $db->prepare("INSERT INTO `cryptsy` (`type`, `coins`) VALUES ('$type', :coins-0.001)");
-		$insert_query->bindParam(':coins', $row['SUM(balance)'], PDO::PARAM_STR);
+		$insert_query->bindParam(':coins', $sum, PDO::PARAM_STR);
 		$insert_query->execute();
 		$sid = $db->lastInsertId();
 
@@ -91,7 +102,6 @@ function tocryptsy($type, $min, $send, $address){
 		$update_query->execute();
 		}
 	}
-
 }
 
 function order_id($type, $marketid){
@@ -257,8 +267,10 @@ $cryptsy_drk = 'XsRzSLTYopmD3bhodgU4oJdGLk43ejZ697';
 $cryptsy_ftc = '6zPcQ3a9KdPxQy1fuJ1ouJwLCL2F9BgxE5';
 
 
+if($_GET['do'] != 'gen' && $_SERVER['REMOTE_ADDR'] != $allow) die;
+
 switch($_GET['do']){
-default: die('xDD'); break;
+default: break;
 
 case 'gen':
 if(preg_match('/[^0-9a-zA-Z]/', $_POST['address'])) die("invalid");
@@ -296,40 +308,33 @@ echo $address;
 break;
 
 case 'balance':
-if($_SERVER['REMOTE_ADDR'] != $allow) die;
 balance($darkcoin->listunspent(121,1000), 'DRK');
 balance($feathercoin->listunspent(121,1000), 'FTC');
 break;
 
 
 case 'tocryptsy':
-if($_SERVER['REMOTE_ADDR'] != $allow) die;
 tocryptsy('DRK', '0.1', '1.5', $cryptsy_drk);
 tocryptsy('FTC', '5', '50', $cryptsy_ftc);
 break;
 
 case "order_id":
-if($_SERVER['REMOTE_ADDR'] != $allow) die;
 order_id('DRK', 155);
 order_id('FTC', 5);
 break;
 
 case "buy_vtc":
-if($_SERVER['REMOTE_ADDR'] != $allow) die;
 buy_vtc('DRK', 151);
 buy_vtc('FTC', 151);
 break;
 
 
 case "check_buy":
-if($_SERVER['REMOTE_ADDR'] != $allow) die;
 check_buy(151);
 break;
 
 
 case 'out':
-if($_SERVER['REMOTE_ADDR'] != $allow) die;
-
 $select_query = $db->prepare("SELECT * FROM `cryptsy` WHERE `status` = '2'");
 $select_query->execute();
 if($select_query->rowCount() > 0){
@@ -351,9 +356,6 @@ var_dump($result);
 break;
 
 case 'send':
-
-if($_SERVER['REMOTE_ADDR'] != $allow) die;
-
 $select_query = $db->prepare("SELECT *  FROM `cryptsy` WHERE `status` = '3'");
 $select_query->execute();
 if($select_query->rowCount() > 0){
