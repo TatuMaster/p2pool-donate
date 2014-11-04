@@ -109,17 +109,33 @@ function order_id($type, $marketid){
 	$select_query->execute();
 	if($select_query->rowCount() > 0){
 		while($row = $select_query->fetch()){
-
+		
 		$result = api_query("allmytrades", array("startdate" => date("Y-m-d", time()-60*60*24*5), 'enddate' => date("Y-m-d", time()+60*60*24)));
 			for($i=0; $i < count($result['return']); $i++){
-			if(round($row['coins'], 8, PHP_ROUND_HALF_DOWN) == $result['return'][$i]['quantity'] && $result['return'][$i]['marketid'] == $marketid){
-				$update_query = $db->prepare("UPDATE `cryptsy` SET `order_id` = :order_id, `btc` = :btc-:fee, `status` = '1' WHERE `id` = :id");
-				$update_query->bindParam(':order_id', $result['return'][$i]['order_id'], PDO::PARAM_STR);
-				$update_query->bindParam(':fee', $result['return'][$i]['fee'], PDO::PARAM_STR);
-				$update_query->bindParam(':btc', $result['return'][$i]['total'], PDO::PARAM_STR);
-				$update_query->bindParam(':id', $row['id'], PDO::PARAM_STR);
-				$update_query->execute();
-				echo $result['return'][$i]['order_id']."<br/>";
+				$xcoins = $xfee = $xtotal = 0;
+			
+				for($n=0; $n < count($result['return']); $n++ ){
+					if($result['return'][$i]['order_id'] == $result['return'][$n]['order_id']){
+						$xcoins = $xcoins + $result['return'][$n]['quantity'];
+						$xfee	= $xfee   + $result['return'][$n]['fee'];
+						$xtotal = $xtotal + $result['return'][$n]['total'];
+						}
+				}
+				
+			$status_query = $db->prepare("SELECT * FROM `cryptsy` WHERE `id` = :id AND `status` = '0'"); // убираем дубли
+			$status_query->bindParam(':id', $row['id'], PDO::PARAM_STR);
+			$status_query->execute();
+			if($select_query->rowCount() == 1){	
+				if(round($row['coins'], 8, PHP_ROUND_HALF_DOWN) == $xcoins && $result['return'][$i]['marketid'] == $marketid){
+					$update_query = $db->prepare("UPDATE `cryptsy` SET `order_id` = :order_id, `btc` = :btc-:fee, `status` = '1' WHERE `id` = :id");
+					$update_query->bindParam(':order_id', $result['return'][$i]['order_id'], PDO::PARAM_STR);
+					$update_query->bindParam(':fee', $xfee, PDO::PARAM_STR);
+					$update_query->bindParam(':btc', $xtotal, PDO::PARAM_STR);
+					$update_query->bindParam(':id', $row['id'], PDO::PARAM_STR);
+					$update_query->execute();
+					echo $result['return'][$i]['order_id']."<br/>";
+					}
+					echo "{$result['return'][$i]['order_id']} => {$row['coins']} != {$xcoins}<br/>";
 				}
 			}
 		}
