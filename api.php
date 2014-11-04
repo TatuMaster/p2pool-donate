@@ -50,7 +50,6 @@ function balance($a, $c){
 }
 
 function tocryptsy($type, $min, $send, $address){
-
 	global $db, $darkcoin, $feathercoin;
 	$select_query = $db->prepare("SELECT * FROM `address` WHERE `balance` > $min AND `type` = '$type'");
 	$select_query->execute();
@@ -58,7 +57,7 @@ function tocryptsy($type, $min, $send, $address){
 	if($select_query->rowCount() > 0){
 	
 		if($select_query->rowCount() > 1){
-			$select_query = $db->prepare("SELECT SUM(balance) FROM `address` WHERE `balance` > '$min' AND `type` = '$type'");
+			$select_query = $db->prepare("SELECT SUM(balance) FROM `address` WHERE `balance` > $min AND `type` = '$type'");
 			$select_query->execute();
 			$row = $select_query->fetch();
 			$sum = $row['SUM(balance)'];
@@ -68,7 +67,7 @@ function tocryptsy($type, $min, $send, $address){
 		}
 
 	if($sum > $send){
-	
+		
 		$send_coins = $sum-0.001;
 
 		$insert_query = $db->prepare("INSERT INTO `cryptsy` (`type`, `coins`) VALUES ('$type', :coins-0.001)");
@@ -77,7 +76,7 @@ function tocryptsy($type, $min, $send, $address){
 		$sid = $db->lastInsertId();
 
 
-		$select_query = $db->prepare("SELECT * FROM `address` WHERE `balance` > 0.1");
+		$select_query = $db->prepare("SELECT * FROM `address` WHERE `balance` > $min AND `type` = '$type'");
 		$select_query->execute();
 
 		while($row = $select_query->fetch()){
