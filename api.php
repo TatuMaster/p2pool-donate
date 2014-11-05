@@ -182,11 +182,11 @@ function buy_vtc($type, $marketid){
 
 function check_buy($marketid){
 	global $db;
-	$total = $coins = 0;
 	$select_query = $db->prepare("SELECT * FROM `buy_log` WHERE `status` = '0'");
 	$select_query->execute();
 	if($select_query->rowCount() > 0){
 		while($row = $select_query->fetch()){
+			$total = $coins = 0;
 			$result = api_query("allmytrades", array("startdate" => date("Y-m-d", time()-60*60*24*5), 'enddate' => date("Y-m-d", time()+60*60*24)));
 				for($i=0; $i < count($result['return']); $i++){
 					if($result['return'][$i]['marketid'] == $marketid){
